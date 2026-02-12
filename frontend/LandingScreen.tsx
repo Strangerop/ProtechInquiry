@@ -15,8 +15,10 @@ interface LandingScreenProps {
 interface Exhibition {
     _id: string;
     name: string;
+    city?: string;
     location?: string;
     date?: string;
+    customerCount?: number;
 }
 
 export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddExhibition }) => {
@@ -118,12 +120,24 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddExh
                                 })}
                             >
                                 <View style={styles.customerInfo}>
-                                    <ThemedText style={styles.customerName}>{exhibition.name}</ThemedText>
-                                    <View style={styles.exhibitionMeta}>
-                                        <Ionicons name="location-outline" size={12} color="#64748b" />
-                                        <ThemedText style={styles.customerCompany}>
-                                            {exhibition.location || 'Not specified'}
-                                        </ThemedText>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <ThemedText style={styles.customerName}>{exhibition.name}</ThemedText>
+                                    </View>
+                                    <View style={styles.exhibitionMetaRow}>
+                                        <View style={styles.exhibitionMeta}>
+                                            <Ionicons name="business-outline" size={12} color="#64748b" />
+                                            <ThemedText style={styles.customerCompany}>
+                                                {exhibition.city || 'Not specified'}
+                                            </ThemedText>
+                                        </View>
+                                        {exhibition.date && (
+                                            <View style={styles.exhibitionMeta}>
+                                                <Ionicons name="calendar-outline" size={12} color="#64748b" />
+                                                <ThemedText style={styles.customerCompany}>
+                                                    {exhibition.date}
+                                                </ThemedText>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#6366f1" />
@@ -262,7 +276,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+    },
+    exhibitionMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
         marginTop: 4,
+    },
+    countBadge: {
+        backgroundColor: '#eef2ff',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e0e7ff',
+    },
+    countText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6366f1',
     },
     customerName: {
         fontSize: 16,

@@ -21,8 +21,10 @@ import {
 interface Exhibition {
     _id: string;
     name: string;
+    city?: string;
     location?: string;
-    city: string;
+    date?: string;
+    customerCount?: number;
 }
 
 // Updated Interface for Lead
@@ -115,7 +117,8 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
     // Filter logic for search bar
     const filteredExhibitions = exhibitions.filter(ex =>
         ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (ex.location && ex.location.toLowerCase().includes(searchQuery.toLowerCase()))
+        (ex.location && ex.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (ex.city && ex.city.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     const filteredLeads = leads.filter(lead =>
@@ -136,10 +139,25 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
             <View style={styles.exhibitionInfo}>
                 <Ionicons name="folder-outline" size={32} color="#6366f1" />
                 <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.exhibitionName}>{item.name}</ThemedText>
-                    <ThemedText style={styles.exhibitionLocation}>
-                        {item.location || 'No location specified'}
-                    </ThemedText>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <ThemedText style={styles.exhibitionName}>{item.name}</ThemedText>
+                    </View>
+                    <View style={styles.exhibitionMetaRow}>
+                        <View style={styles.exhibitionMeta}>
+                            <Ionicons name="business-outline" size={12} color="#64748b" />
+                            <ThemedText style={styles.exhibitionCity}>
+                                {item.city || 'Not specified'}
+                            </ThemedText>
+                        </View>
+                        {item.date && (
+                            <View style={styles.exhibitionMeta}>
+                                <Ionicons name="calendar-outline" size={12} color="#64748b" />
+                                <ThemedText style={styles.exhibitionCity}>
+                                    {item.date}
+                                </ThemedText>
+                            </View>
+                        )}
+                    </View>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
             </View>
@@ -355,10 +373,33 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#1e293b',
     },
-    exhibitionLocation: {
+    exhibitionMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    exhibitionMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginTop: 4,
+    },
+    exhibitionCity: {
         fontSize: 14,
         color: '#64748b',
-        marginTop: 2,
+    },
+    countBadge: {
+        backgroundColor: '#eef2ff',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#e0e7ff',
+    },
+    countText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#6366f1',
     },
     card: {
         backgroundColor: 'white',

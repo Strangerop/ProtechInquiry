@@ -191,20 +191,25 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
             data.append('otherRequirement', formData.otherRequirement);
             data.append('exhibitionName', formData.exhibitionName);
 
-            if (formData.cardFront && formData.cardFront.startsWith('file://')) {
+            // Helper check for local URI (file:// or content://) vs remote URL (http:// or https://)
+            const isLocalUri = (uri: string) => !uri.startsWith('http://') && !uri.startsWith('https://');
+
+            if (formData.cardFront && isLocalUri(formData.cardFront)) {
                 const localUri = formData.cardFront;
                 const filename = localUri.split('/').pop() || 'front.jpg';
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : 'image/jpeg';
                 data.append('cardFront', { uri: localUri, name: filename, type: type } as any);
+                console.log('Appended cardFront:', filename);
             }
 
-            if (formData.cardBack && formData.cardBack.startsWith('file://')) {
+            if (formData.cardBack && isLocalUri(formData.cardBack)) {
                 const localUri = formData.cardBack;
                 const filename = localUri.split('/').pop() || 'back.jpg';
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : 'image/jpeg';
                 data.append('cardBack', { uri: localUri, name: filename, type: type } as any);
+                console.log('Appended cardBack:', filename);
             }
 
             const response = await fetch(url, {

@@ -47,7 +47,20 @@ app.use(express.static(__dirname));
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/customer_details_db';
 
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
+  .then(async () => {
+    console.log('✅ Connected to MongoDB');
+    // Migration: Ensure all records have a city field (defaulting to Mumbai if missing)
+    try {
+      const exhibitionUpdate = await Exhibition.updateMany({ city: { $exists: false } }, { $set: { city: 'Mumbai' } });
+      const customerUpdate = await Customer.updateMany({ city: { $exists: false } }, { $set: { city: 'Mumbai' } });
+      const leadUpdate = await Lead.updateMany({ city: { $exists: false } }, { $set: { city: 'Mumbai' } });
+      if (exhibitionUpdate.modifiedCount > 0 || customerUpdate.modifiedCount > 0 || leadUpdate.modifiedCount > 0) {
+        console.log(`📊 Migration: Updated ${exhibitionUpdate.modifiedCount} exhibitions, ${customerUpdate.modifiedCount} customers, and ${leadUpdate.modifiedCount} leads with default city.`);
+      }
+    } catch (err) {
+      console.error('❌ Migration error:', err);
+    }
+  })
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // Root route handler
@@ -101,7 +114,7 @@ const leadSchema = new mongoose.Schema({
   cardFront: { type: String },
   cardBack: { type: String },
   priority: { type: String, enum: ['Normal', 'Imp', 'Most Imp', 'Urgent'], default: 'Normal' },
-  city: { type: String, default: 'Mumbai' },
+  city: { type: String, default: 'Mumbai', trim: true },
   exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   createdAt: { type: Date, default: Date.now },
   requirement: [{ type: String }],
@@ -139,18 +152,66 @@ const uploadFromBuffer = (buffer) => {
     streamifier.createReadStream(buffer).pipe(stream);
   });
 };
+
+// Helper to parse DD/MM/YYYY date strings
+const parseDate = (dateStr) => {
+  if (!dateStr) return undefined;
+  if (dateStr instanceof Date) return dateStr;
+  const [day, month, year] = dateStr.split('/').map(Number);
+  if (day && month && year) {
+    return new Date(year, month - 1, day);
+  }
+  const parsed = new Date(dateStr);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+};
 // Exhibition Routes
 app.get('/api/exhibitions', async (req, res) => {
   try {
     const { city } = req.query;
-    const query = {};
+    const match = {};
     if (city && city !== 'All') {
-      query.city = city;
+      match.city = { $regex: new RegExp(`^${city}$`, 'i') };
     }
-    const exhibitions = await Exhibition.find(query).sort({ createdAt: -1 });
+
+    // Use aggregation to get exhibitions and their lead counts
+    const exhibitions = await Exhibition.aggregate([
+      { $match: match },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'user', // Note: Leads and Customers are in the 'user' collection
+          localField: 'name',
+          foreignField: 'exhibitionName',
+          as: 'leads'
+        }
+      },
+      {
+        $addFields: {
+          customerCount: { $size: '$leads' }
+        }
+      },
+      {
+        $project: {
+          leads: 0 // Remove the actual lead documents to keep response small
+        }
+      }
+    ]);
+
     res.json({ success: true, data: exhibitions });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch exhibitions', error: error.message });
+  }
+});
+
+app.get('/api/exhibitions/:name', async (req, res) => {
+  try {
+    const exhibition = await Exhibition.findOne({ name: req.params.name });
+    if (!exhibition) {
+      return res.status(404).json({ success: false, message: 'Exhibition not found' });
+    }
+    res.json({ success: true, data: exhibition });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch exhibition', error: error.message });
   }
 });
 
@@ -165,7 +226,7 @@ app.post('/api/exhibitions', async (req, res) => {
       name,
       location,
       city: req.body.city || 'Mumbai',
-      date,
+      date: date || new Date().toLocaleDateString('en-GB'), // Default to today in DD/MM/YYYY
       description
     });
 
@@ -257,6 +318,8 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
 // Update lead with dual image support
 app.put('/api/leads/:id', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name: 'cardBack', maxCount: 1 }]), async (req, res) => {
   try {
+    const { name, email, mobileNumber, priority, visitDate, whatsappNumber, companyName, requirement, requirementDescription, otherRequirement } = req.body;
+
     let requirementArray = [];
     if (requirement) {
       requirementArray = Array.isArray(requirement) ? requirement : requirement.split(',').map(r => r.trim());
@@ -267,7 +330,7 @@ app.put('/api/leads/:id', upload.fields([{ name: 'cardFront', maxCount: 1 }, { n
       email,
       mobileNumber,
       priority,
-      visitDate,
+      visitDate: parseDate(visitDate),
       whatsappNumber,
       companyName,
       requirement: requirementArray,
@@ -322,7 +385,7 @@ app.get('/api/leads', async (req, res) => {
     }
 
     if (city && city !== 'All') {
-      query.city = city;
+      query.city = { $regex: new RegExp(`^${city}$`, 'i') };
     }
 
     if (exhibitionName && exhibitionName !== 'All') {
@@ -402,15 +465,17 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
     let cardBackUrl = '';
 
     if (req.files) {
+      const uploadPromises = [];
       if (req.files.cardFront) {
         console.log("DEBUG: Uploading customer cardFront to Cloudinary...");
-        const result = await uploadFromBuffer(req.files.cardFront[0].buffer);
-        cardFrontUrl = result.secure_url;
+        uploadPromises.push(uploadFromBuffer(req.files.cardFront[0].buffer).then(r => cardFrontUrl = r.secure_url));
       }
       if (req.files.cardBack) {
         console.log("DEBUG: Uploading customer cardBack to Cloudinary...");
-        const result = await uploadFromBuffer(req.files.cardBack[0].buffer);
-        cardBackUrl = result.secure_url;
+        uploadPromises.push(uploadFromBuffer(req.files.cardBack[0].buffer).then(r => cardBackUrl = r.secure_url));
+      }
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
       }
     }
 
@@ -430,13 +495,13 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
       mobileNumber,
       whatsappNumber: whatsappNumber || mobileNumber,
       email,
-      requirement,
+      requirement: requirementArray,
       requirementDescription,
       otherRequirement,
       priority: priority || 'Normal',
       city: req.body.city || 'Mumbai',
       exhibitionName: req.body.exhibitionName || 'Tech Expo Mumbai',
-      visitDate: visitDate || Date.now(),
+      visitDate: parseDate(visitDate) || Date.now(),
       type: 'Customer'
     });
 
@@ -480,7 +545,7 @@ app.get('/api/customers', async (req, res) => {
     }
 
     if (city && city !== 'All') {
-      query.city = city;
+      query.city = { $regex: new RegExp(`^${city}$`, 'i') };
     }
 
     if (exhibitionName && exhibitionName !== 'All') {
@@ -580,7 +645,7 @@ app.put('/api/customers/:id', upload.fields([{ name: 'cardFront', maxCount: 1 },
       requirementDescription,
       otherRequirement,
       priority,
-      visitDate,
+      visitDate: parseDate(visitDate),
       updatedAt: Date.now()
     };
 
@@ -589,15 +654,17 @@ app.put('/api/customers/:id', upload.fields([{ name: 'cardFront', maxCount: 1 },
     }
 
     if (req.files) {
+      const uploadPromises = [];
       if (req.files.cardFront) {
         console.log("DEBUG: Updating customer cardFront...");
-        const result = await uploadFromBuffer(req.files.cardFront[0].buffer);
-        updateData.cardFront = result.secure_url;
+        uploadPromises.push(uploadFromBuffer(req.files.cardFront[0].buffer).then(r => updateData.cardFront = r.secure_url));
       }
       if (req.files.cardBack) {
         console.log("DEBUG: Updating customer cardBack...");
-        const result = await uploadFromBuffer(req.files.cardBack[0].buffer);
-        updateData.cardBack = result.secure_url;
+        uploadPromises.push(uploadFromBuffer(req.files.cardBack[0].buffer).then(r => updateData.cardBack = r.secure_url));
+      }
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
       }
     }
 

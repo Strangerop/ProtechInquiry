@@ -26,18 +26,31 @@ export default function ExhibitionDetailScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [exhibition, setExhibition] = useState<{ city?: string, date?: string } | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const fetchExhibitionCustomers = async () => {
+    const fetchExhibitionData = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}?exhibitionName=${encodeURIComponent(name as string)}`);
-            const data = await response.json();
-            if (data.success) {
-                setCustomers(data.data);
+            const baseUrl = API_URL.replace(/\/customers$/, '');
+
+            // Parallel fetch for customers and exhibition details
+            const [custRes, exRes] = await Promise.all([
+                fetch(`${API_URL}?exhibitionName=${encodeURIComponent(name as string)}`),
+                fetch(`${baseUrl}/exhibitions/${encodeURIComponent(name as string)}`)
+            ]);
+
+            const custData = await custRes.json();
+            const exData = await exRes.json();
+
+            if (custData.success) {
+                setCustomers(custData.data);
+            }
+            if (exData.success) {
+                setExhibition(exData.data);
             }
         } catch (error) {
-            console.error('Failed to fetch exhibition customers:', error);
+            console.error('Failed to fetch exhibition data:', error);
         } finally {
             setLoading(false);
         }
@@ -45,7 +58,7 @@ export default function ExhibitionDetailScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            fetchExhibitionCustomers();
+            fetchExhibitionData();
         }, [name])
     );
 
@@ -83,7 +96,23 @@ export default function ExhibitionDetailScreen() {
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="#1e293b" />
                 </TouchableOpacity>
-                <ThemedText type="title" style={styles.title}>{name}</ThemedText>
+                <View style={{ flex: 1 }}>
+                    <ThemedText type="title" style={styles.title}>{name}</ThemedText>
+                    {exhibition && (
+                        <View style={styles.exhibitionMetaRow}>
+                            <View style={styles.exhibitionMeta}>
+                                <Ionicons name="business-outline" size={12} color="#64748b" />
+                                <ThemedText style={styles.exhibitionMetaText}>{exhibition.city}</ThemedText>
+                            </View>
+                            {exhibition.date && (
+                                <View style={styles.exhibitionMeta}>
+                                    <Ionicons name="calendar-outline" size={12} color="#64748b" />
+                                    <ThemedText style={styles.exhibitionMetaText}>{exhibition.date}</ThemedText>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
             </View>
 
             <View style={styles.content}>
@@ -145,6 +174,21 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: '700',
         color: '#1e293b',
+    },
+    exhibitionMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 2,
+    },
+    exhibitionMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    exhibitionMetaText: {
+        fontSize: 12,
+        color: '#64748b',
     },
     content: {
         flex: 1,
