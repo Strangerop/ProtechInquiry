@@ -1,42 +1,30 @@
-import { CustomerFormScreen } from '@/frontend/CustomerFormScreen';
 import { LandingScreen } from '@/frontend/LandingScreen';
 import { SplashScreen } from '@/frontend/SplashScreen';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function Index() {
-  const [currentScreen, setCurrentScreen] = useState<'splash' | 'landing' | 'form'>('splash');
+  const [showSplash, setShowSplash] = useState(true);
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   useEffect(() => {
     // Show splash screen for 2 seconds
     const timer = setTimeout(() => {
-      setCurrentScreen('landing');
+      setShowSplash(false);
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
 
-  const handleShowForm = () => {
-    setCurrentScreen('form');
+  const handleAddCustomer = () => {
+    router.push('/customer/new');
   };
 
-  const handleBackToLanding = () => {
-    setCurrentScreen('landing');
-  };
-
-  if (currentScreen === 'splash') {
+  if (showSplash) {
     return <SplashScreen topInset={insets.top} />;
   }
 
-  if (currentScreen === 'landing') {
-    return <LandingScreen topInset={insets.top} onAddCustomer={handleShowForm} />;
-  }
-
-  return (
-    <CustomerFormScreen
-      topInset={insets.top}
-      onBack={handleBackToLanding}
-    />
-  );
+  return <LandingScreen topInset={insets.top} onAddCustomer={handleAddCustomer} />;
 }
