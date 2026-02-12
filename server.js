@@ -79,7 +79,7 @@ const customerSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
   // Fields from Lead schema (merged)
   photoUrl: { type: String },
-  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
+  city: { type: String, default: 'Mumbai' },
   exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   type: { type: String, enum: ['Customer', 'Lead'], default: 'Customer' }
 });
@@ -101,7 +101,7 @@ const leadSchema = new mongoose.Schema({
   cardFront: { type: String },
   cardBack: { type: String },
   priority: { type: String, enum: ['Normal', 'Imp', 'Most Imp', 'Urgent'], default: 'Normal' },
-  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
+  city: { type: String, default: 'Mumbai' },
   exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   createdAt: { type: Date, default: Date.now },
   requirement: [{ type: String }],
@@ -114,7 +114,7 @@ const Lead = mongoose.model('Lead', leadSchema, 'user');
 const exhibitionSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, unique: true },
   location: { type: String, trim: true },
-  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
+  city: { type: String, default: 'Mumbai' },
   date: { type: String, trim: true },
   description: { type: String, trim: true },
   createdAt: { type: Date, default: Date.now },
