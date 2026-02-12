@@ -9,34 +9,32 @@ import { ActivityIndicator, Image, ScrollView, StyleSheet, TouchableOpacity, Vie
 
 interface LandingScreenProps {
     topInset: number;
-    onAddCustomer: () => void;
+    onAddExhibition: () => void;
 }
 
-interface Customer {
+interface Exhibition {
     _id: string;
     name: string;
-    companyName: string;
-    priority: string;
-    createdAt: string;
+    location?: string;
+    date?: string;
 }
 
-export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddCustomer }) => {
+export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddExhibition }) => {
     const router = useRouter();
-    const [stats, setStats] = useState({ totalCustomers: 0 });
-    const [recentCustomers, setRecentCustomers] = useState<Customer[]>([]);
+    const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchDashboardData = async () => {
+    const fetchExhibitions = async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}?limit=5`);
+            const baseUrl = API_URL.replace(/\/customers$/, '');
+            const response = await fetch(`${baseUrl}/exhibitions`);
             const data = await response.json();
             if (data.success) {
-                setStats({ totalCustomers: data.pagination.total });
-                setRecentCustomers(data.data);
+                setExhibitions(data.data);
             }
         } catch (error) {
-            console.error('Failed to fetch dashboard data:', error);
+            console.error('Failed to fetch exhibitions:', error);
         } finally {
             setLoading(false);
         }
@@ -44,18 +42,9 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddCus
 
     useFocusEffect(
         useCallback(() => {
-            fetchDashboardData();
+            fetchExhibitions();
         }, [])
     );
-
-    const getPriorityColor = (priority: string) => {
-        switch (priority) {
-            case 'Urgent': return '#ef4444';
-            case 'Most Imp': return '#f97316';
-            case 'Imp': return '#3b82f6';
-            default: return '#64748b';
-        }
-    };
 
     return (
         <ThemedView style={[styles.landingContainer, { paddingTop: topInset }]}>
@@ -72,67 +61,72 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ topInset, onAddCus
                         resizeMode="contain"
                     />
                 </View>
-                <ThemedText type="title" style={styles.landingTitle}>Dashboard</ThemedText>
+                <ThemedText type="title" style={styles.landingTitle}>Exhibitions</ThemedText>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Stats Card */}
                 <View style={styles.statsCard}>
                     <View style={{ flex: 1, marginRight: 10 }}>
-                        <ThemedText style={styles.statsLabel}>Total Leads</ThemedText>
+                        <ThemedText style={styles.statsLabel}>Active Exhibitions</ThemedText>
                         <ThemedText
                             style={styles.statsValue}
                             numberOfLines={1}
                             adjustsFontSizeToFit
                         >
-                            {loading ? '...' : stats.totalCustomers}
+                            {loading ? '...' : exhibitions.length}
                         </ThemedText>
                     </View>
                     <View style={styles.statsIcon}>
-                        <Ionicons name="people" size={32} color="#6366f1" />
+                        <Ionicons name="business" size={32} color="#6366f1" />
                     </View>
                 </View>
 
                 {/* Quick Action */}
                 <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={onAddCustomer}
+                    onPress={onAddExhibition}
                 >
                     <View style={styles.actionIconContainer}>
-                        <Ionicons name="person-add-outline" size={24} color="white" />
+                        <Ionicons name="add-circle-outline" size={24} color="white" />
                     </View>
                     <View style={styles.actionTextContainer}>
-                        <ThemedText style={styles.actionTitle}>Add New Customer</ThemedText>
-                        <ThemedText style={styles.actionDesc}>Tap to open form</ThemedText>
+                        <ThemedText style={styles.actionTitle}>Add New Exhibition</ThemedText>
+                        <ThemedText style={styles.actionDesc}>Create a new event folder</ThemedText>
                     </View>
                     <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.7)" />
                 </TouchableOpacity>
 
-                {/* Recent Leads */}
+                {/* Exhibition Cards */}
                 <View style={styles.recentSection}>
-                    <ThemedText type="subtitle" style={styles.sectionTitle}>Recent Leads</ThemedText>
+                    <ThemedText type="subtitle" style={styles.sectionTitle}>Select Exhibition</ThemedText>
                     {loading ? (
                         <ActivityIndicator color="#6366f1" style={{ marginTop: 20 }} />
-                    ) : recentCustomers.length === 0 ? (
+                    ) : exhibitions.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <ThemedText style={styles.emptyText}>No leads yet</ThemedText>
+                            <Ionicons name="journal-outline" size={48} color="#cbd5e1" />
+                            <ThemedText style={styles.emptyText}>No exhibitions added yet</ThemedText>
                         </View>
                     ) : (
-                        recentCustomers.map((customer) => (
+                        exhibitions.map((exhibition) => (
                             <TouchableOpacity
-                                key={customer._id}
+                                key={exhibition._id}
                                 style={styles.customerCard}
-                                onPress={() => router.push({ pathname: '/customer/[id]', params: { id: customer._id, readOnly: 'true' } })}
+                                onPress={() => router.push({
+                                    pathname: '/exhibition/[name]',
+                                    params: { name: exhibition.name }
+                                })}
                             >
                                 <View style={styles.customerInfo}>
-                                    <ThemedText style={styles.customerName}>{customer.name}</ThemedText>
-                                    <ThemedText style={styles.customerCompany}>{customer.companyName}</ThemedText>
+                                    <ThemedText style={styles.customerName}>{exhibition.name}</ThemedText>
+                                    <View style={styles.exhibitionMeta}>
+                                        <Ionicons name="location-outline" size={12} color="#64748b" />
+                                        <ThemedText style={styles.customerCompany}>
+                                            {exhibition.location || 'Not specified'}
+                                        </ThemedText>
+                                    </View>
                                 </View>
-                                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(customer.priority) + '20' }]}>
-                                    <ThemedText style={[styles.priorityText, { color: getPriorityColor(customer.priority) }]}>
-                                        {customer.priority}
-                                    </ThemedText>
-                                </View>
+                                <Ionicons name="chevron-forward" size={20} color="#6366f1" />
                             </TouchableOpacity>
                         ))
                     )}
@@ -263,6 +257,12 @@ const styles = StyleSheet.create({
     },
     customerInfo: {
         flex: 1,
+    },
+    exhibitionMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
     },
     customerName: {
         fontSize: 16,

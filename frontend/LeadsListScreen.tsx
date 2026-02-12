@@ -1,6 +1,8 @@
+import { ExhibitionSelector } from '@/components/exhibition-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API_URL } from '@/constants/config';
+import { useExhibitionFilter } from '@/hooks/use-exhibition-filter';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -25,6 +27,7 @@ interface Lead {
     photoUrl?: string; // Optional now
     cardFront?: string; // Optional fallback
     createdAt: string;
+    exhibitionName: string;
 }
 
 interface LeadsListScreenProps {
@@ -33,6 +36,7 @@ interface LeadsListScreenProps {
 
 export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) => {
     const router = useRouter();
+    const { selectedExhibition, setSelectedExhibition } = useExhibitionFilter();
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,18 +45,24 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
     const [selectedPriority, setSelectedPriority] = useState('All');
     const priorities = ['All', 'Normal', 'Imp', 'Most Imp', 'Urgent'];
 
-    const fetchLeads = async (priority = selectedPriority) => {
+    const fetchLeads = async (priority = selectedPriority, exhibition = selectedExhibition) => {
         try {
             setLoading(true);
 
             // Construct URL: Replace /customers with /leads if needed, or use a new constant
             // Assuming API_URL is still .../api/customers, we strip it.
             const baseUrl = API_URL.replace(/\/customers$/, '');
-            let leadsUrl = `${baseUrl}/leads`;
+            let leadsUrl = `${baseUrl}/leads?`;
 
+            const params = new URLSearchParams();
             if (priority && priority !== 'All') {
-                leadsUrl += `?priority=${encodeURIComponent(priority)}`;
+                params.append('priority', priority);
             }
+            if (exhibition && exhibition !== 'All') {
+                params.append('exhibitionName', exhibition);
+            }
+
+            leadsUrl += params.toString();
 
             console.log('Fetching leads from:', leadsUrl);
 
@@ -75,7 +85,7 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
     useFocusEffect(
         useCallback(() => {
             fetchLeads();
-        }, [selectedPriority])
+        }, [selectedPriority, selectedExhibition])
     );
 
     const onRefresh = () => {
@@ -178,6 +188,9 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
                     </TouchableOpacity>
                 ))}
             </ScrollView>
+
+            {/* Exhibition Selector */}
+            <ExhibitionSelector selectedExhibition={selectedExhibition} onSelectExhibition={setSelectedExhibition} />
 
             {/* Leads List */}
             <FlatList

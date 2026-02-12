@@ -23,9 +23,10 @@ interface CustomerFormScreenProps {
     customerId?: string; // Optional ID for editing
     readOnly?: boolean; // Optional flag for read-only view
     isLead?: boolean; // Optional flag to indicate Lead vs Customer
+    initialExhibition?: string; // Initial exhibition from navigation
 }
 
-export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset, onBack, customerId, readOnly, isLead }) => {
+export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset, onBack, customerId, readOnly, isLead, initialExhibition }) => {
     const [loading, setLoading] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [formData, setFormData] = useState({
@@ -41,6 +42,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
         requirementDescription: '',
         otherRequirement: '',
         priority: 'Normal',
+        exhibitionName: initialExhibition || 'Tech Expo Mumbai',
         visitDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }), // Default to today DD/MM/YYYY
     });
 
@@ -91,6 +93,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
                             requirementDescription: item.requirementDescription || '',
                             otherRequirement: item.otherRequirement || '',
                             priority: item.priority || 'Normal',
+                            exhibitionName: item.exhibitionName || 'Tech Expo Mumbai',
                             visitDate: item.visitDate ? new Date(item.visitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' }),
                         });
                     }
@@ -186,6 +189,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
             data.append('requirement', formData.requirement);
             data.append('requirementDescription', formData.requirementDescription);
             data.append('otherRequirement', formData.otherRequirement);
+            data.append('exhibitionName', formData.exhibitionName);
 
             if (formData.cardFront && formData.cardFront.startsWith('file://')) {
                 const localUri = formData.cardFront;
@@ -228,6 +232,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
                         requirementDescription: '',
                         otherRequirement: '',
                         priority: 'Normal',
+                        exhibitionName: initialExhibition || 'Tech Expo Mumbai',
                         visitDate: new Date().toLocaleDateString('en-GB'),
                     });
                 }

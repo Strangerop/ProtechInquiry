@@ -79,6 +79,8 @@ const customerSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now },
   // Fields from Lead schema (merged)
   photoUrl: { type: String },
+  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
+  exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   type: { type: String, enum: ['Customer', 'Lead'], default: 'Customer' }
 });
 
@@ -99,11 +101,25 @@ const leadSchema = new mongoose.Schema({
   cardFront: { type: String },
   cardBack: { type: String },
   priority: { type: String, enum: ['Normal', 'Imp', 'Most Imp', 'Urgent'], default: 'Normal' },
+  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
+  exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   createdAt: { type: Date, default: Date.now },
   type: { type: String, default: 'Lead' } // Force type 'Lead'
 });
 
 const Lead = mongoose.model('Lead', leadSchema, 'user');
+
+// Exhibition Schema
+const exhibitionSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true, unique: true },
+  location: { type: String, trim: true },
+  date: { type: String, trim: true },
+  description: { type: String, trim: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const Exhibition = mongoose.model('Exhibition', exhibitionSchema);
 
 // Helper function to upload buffer to Cloudinary
 const uploadFromBuffer = (buffer) => {
@@ -121,14 +137,46 @@ const uploadFromBuffer = (buffer) => {
     streamifier.createReadStream(buffer).pipe(stream);
   });
 };
+// Exhibition Routes
+app.get('/api/exhibitions', async (req, res) => {
+  try {
+    const exhibitions = await Exhibition.find().sort({ createdAt: -1 });
+    res.json({ success: true, data: exhibitions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch exhibitions', error: error.message });
+  }
+});
 
+app.post('/api/exhibitions', async (req, res) => {
+  try {
+    const { name, location, date, description } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Exhibition name is required.' });
+    }
+
+    const exhibition = new Exhibition({
+      name,
+      location,
+      date,
+      description
+    });
+
+    await exhibition.save();
+    res.status(201).json({ success: true, data: exhibition });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Exhibition with this name already exists.' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to create exhibition', error: error.message });
+  }
+});
 // API Routes
 
 // Create new lead with dual image upload support
 app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name: 'cardBack', maxCount: 1 }]), async (req, res) => {
   try {
     console.log("DEBUG: Incoming request to /api/leads (multipart)");
-    const { name, email, mobileNumber, priority } = req.body;
+    const { name, email, mobileNumber, priority, city, exhibitionName } = req.body;
 
     if (!name || !email || !mobileNumber) {
       return res.status(400).json({ success: false, message: 'Name, email, and mobile number are required.' });
@@ -158,6 +206,8 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
       cardFront: cardFrontUrl,
       cardBack: cardBackUrl,
       priority: priority || 'Normal',
+      city: city || 'Mumbai',
+      exhibitionName: exhibitionName || 'Tech Expo Mumbai',
       type: 'Lead'
     });
 
@@ -227,7 +277,7 @@ app.put('/api/leads/:id', upload.fields([{ name: 'cardFront', maxCount: 1 }, { n
 // Get all leads
 app.get('/api/leads', async (req, res) => {
   try {
-    const { priority } = req.query;
+    const { priority, city, exhibitionName } = req.query;
     // User requested "list of all the users" in leads tab.
     // So we remove the type constraint or make it optional.
     // Let's fetch all documents from the User collection (which Lead model points to).
@@ -235,6 +285,14 @@ app.get('/api/leads', async (req, res) => {
 
     if (priority && priority !== 'All') {
       query.priority = priority;
+    }
+
+    if (city && city !== 'All') {
+      query.city = city;
+    }
+
+    if (exhibitionName && exhibitionName !== 'All') {
+      query.exhibitionName = exhibitionName;
     }
 
     const leads = await Lead.find(query).sort({ createdAt: -1 });
@@ -337,6 +395,8 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
       requirementDescription,
       otherRequirement,
       priority: priority || 'Normal',
+      city: req.body.city || 'Mumbai',
+      exhibitionName: req.body.exhibitionName || 'Tech Expo Mumbai',
       visitDate: visitDate || Date.now(),
       type: 'Customer'
     });
@@ -373,8 +433,19 @@ app.get('/api/customers', async (req, res) => {
     const query = {};
 
     // Filter by priority
+    const city = req.query.city;
+    const exhibitionName = req.query.exhibitionName;
+
     if (priority && priority !== 'All') {
       query.priority = priority;
+    }
+
+    if (city && city !== 'All') {
+      query.city = city;
+    }
+
+    if (exhibitionName && exhibitionName !== 'All') {
+      query.exhibitionName = exhibitionName;
     }
 
     // Search functionality
