@@ -70,7 +70,7 @@ const customerSchema = new mongoose.Schema({
   mobileNumber: { type: String, required: true },
   whatsappNumber: { type: String }, // Made optional
   email: { type: String, required: true, lowercase: true, trim: true },
-  requirement: { type: String, enum: ['EMS', 'BMS', 'Other', 'Lead'] }, // Added 'Lead' option
+  requirement: [{ type: String }], // Changed to Array
   requirementDescription: { type: String, trim: true },
   otherRequirement: { type: String, trim: true },
   priority: { type: String, enum: ['Normal', 'Imp', 'Most Imp', 'Urgent'], default: 'Normal' },
@@ -104,6 +104,7 @@ const leadSchema = new mongoose.Schema({
   city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
   exhibitionName: { type: String, required: true, default: 'Tech Expo Mumbai' },
   createdAt: { type: Date, default: Date.now },
+  requirement: [{ type: String }],
   type: { type: String, default: 'Lead' } // Force type 'Lead'
 });
 
@@ -113,6 +114,7 @@ const Lead = mongoose.model('Lead', leadSchema, 'user');
 const exhibitionSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, unique: true },
   location: { type: String, trim: true },
+  city: { type: String, enum: ['Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'], default: 'Mumbai' },
   date: { type: String, trim: true },
   description: { type: String, trim: true },
   createdAt: { type: Date, default: Date.now },
@@ -140,7 +142,12 @@ const uploadFromBuffer = (buffer) => {
 // Exhibition Routes
 app.get('/api/exhibitions', async (req, res) => {
   try {
-    const exhibitions = await Exhibition.find().sort({ createdAt: -1 });
+    const { city } = req.query;
+    const query = {};
+    if (city && city !== 'All') {
+      query.city = city;
+    }
+    const exhibitions = await Exhibition.find(query).sort({ createdAt: -1 });
     res.json({ success: true, data: exhibitions });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch exhibitions', error: error.message });
@@ -157,6 +164,7 @@ app.post('/api/exhibitions', async (req, res) => {
     const exhibition = new Exhibition({
       name,
       location,
+      city: req.body.city || 'Mumbai',
       date,
       description
     });
@@ -170,6 +178,22 @@ app.post('/api/exhibitions', async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to create exhibition', error: error.message });
   }
 });
+app.get('/api/cities', async (req, res) => {
+  try {
+    const exhibitionCities = await Exhibition.distinct('city');
+    const customerCities = await Customer.distinct('city');
+    // Combine and remove duplicates, also filter out empty/null
+    const allCities = [...new Set([...exhibitionCities, ...customerCities])]
+      .filter(Boolean)
+      .sort();
+
+    // Ensure 'All' is not in the list from DB, but we handle it in frontend
+    res.json({ success: true, data: allCities });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch cities', error: error.message });
+  }
+});
+
 // API Routes
 
 // Create new lead with dual image upload support
@@ -180,6 +204,11 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
 
     if (!name || !email || !mobileNumber) {
       return res.status(400).json({ success: false, message: 'Name, email, and mobile number are required.' });
+    }
+
+    let requirementArray = [];
+    if (req.body.requirement) {
+      requirementArray = Array.isArray(req.body.requirement) ? req.body.requirement : req.body.requirement.split(',').map(r => r.trim());
     }
 
     let cardFrontUrl = '';
@@ -208,6 +237,7 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
       priority: priority || 'Normal',
       city: city || 'Mumbai',
       exhibitionName: exhibitionName || 'Tech Expo Mumbai',
+      requirement: requirementArray,
       type: 'Lead'
     });
 
@@ -227,7 +257,11 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
 // Update lead with dual image support
 app.put('/api/leads/:id', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name: 'cardBack', maxCount: 1 }]), async (req, res) => {
   try {
-    const { name, email, mobileNumber, priority, visitDate, whatsappNumber, companyName, requirement, requirementDescription, otherRequirement } = req.body;
+    let requirementArray = [];
+    if (requirement) {
+      requirementArray = Array.isArray(requirement) ? requirement : requirement.split(',').map(r => r.trim());
+    }
+
     let updateData = {
       name,
       email,
@@ -236,7 +270,7 @@ app.put('/api/leads/:id', upload.fields([{ name: 'cardFront', maxCount: 1 }, { n
       visitDate,
       whatsappNumber,
       companyName,
-      requirement,
+      requirement: requirementArray,
       requirementDescription,
       otherRequirement,
       updatedAt: Date.now()
@@ -355,8 +389,13 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
     } = req.body;
 
     // Validation
-    if (!name || !companyName || !mobileNumber || !email || !requirement) {
+    if (!name || !companyName || !mobileNumber || !email) {
       return res.status(400).json({ success: false, message: 'Required text fields are missing.' });
+    }
+
+    let requirementArray = [];
+    if (req.body.requirement) {
+      requirementArray = Array.isArray(req.body.requirement) ? req.body.requirement : req.body.requirement.split(',').map(r => r.trim());
     }
 
     let cardFrontUrl = '';
@@ -544,6 +583,10 @@ app.put('/api/customers/:id', upload.fields([{ name: 'cardFront', maxCount: 1 },
       visitDate,
       updatedAt: Date.now()
     };
+
+    if (requirement) {
+      updateData.requirement = Array.isArray(requirement) ? requirement : requirement.split(',').map(r => r.trim());
+    }
 
     if (req.files) {
       if (req.files.cardFront) {

@@ -1,8 +1,8 @@
-import { ExhibitionSelector } from '@/components/exhibition-selector';
+import { CitySelector } from '@/components/city-selector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { API_URL } from '@/constants/config';
-import { useExhibitionFilter } from '@/hooks/use-exhibition-filter';
+import { useCityFilter } from '@/hooks/use-city-filter';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,13 @@ import {
     View,
 } from 'react-native';
 
+interface Exhibition {
+    _id: string;
+    name: string;
+    location?: string;
+    city: string;
+}
+
 // Updated Interface for Lead
 interface Lead {
     _id: string;
@@ -28,6 +35,8 @@ interface Lead {
     cardFront?: string; // Optional fallback
     createdAt: string;
     exhibitionName: string;
+    city?: string;
+    priority: string; // Added priority
 }
 
 interface LeadsListScreenProps {
@@ -36,46 +45,56 @@ interface LeadsListScreenProps {
 
 export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) => {
     const router = useRouter();
-    const { selectedExhibition, setSelectedExhibition } = useExhibitionFilter();
+    const { selectedCity, setSelectedCity } = useCityFilter();
+
+    // State management
+    const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
+    const [selectedExhibition, setSelectedExhibition] = useState<string | null>(null);
+    const [selectedPriority, setSelectedPriority] = useState('All');
+
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
-    const [selectedPriority, setSelectedPriority] = useState('All');
     const priorities = ['All', 'Normal', 'Imp', 'Most Imp', 'Urgent'];
 
-    const fetchLeads = async (priority = selectedPriority, exhibition = selectedExhibition) => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-
-            // Construct URL: Replace /customers with /leads if needed, or use a new constant
-            // Assuming API_URL is still .../api/customers, we strip it.
             const baseUrl = API_URL.replace(/\/customers$/, '');
-            let leadsUrl = `${baseUrl}/leads?`;
 
-            const params = new URLSearchParams();
-            if (priority && priority !== 'All') {
-                params.append('priority', priority);
-            }
-            if (exhibition && exhibition !== 'All') {
-                params.append('exhibitionName', exhibition);
-            }
-
-            leadsUrl += params.toString();
-
-            console.log('Fetching leads from:', leadsUrl);
-
-            const response = await fetch(leadsUrl);
-            const data = await response.json();
-
-            if (data.success) {
-                setLeads(data.data);
+            if (!selectedExhibition) {
+                // Fetch Exhibitions for the selected city
+                let url = `${baseUrl}/exhibitions?city=${selectedCity}`;
+                console.log('Fetching exhibitions from:', url);
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.success) {
+                    setExhibitions(data.data);
+                } else {
+                    console.error('Fetch exhibitions failed:', data.message);
+                }
             } else {
-                console.error('Fetch failed:', data.message);
+                // Fetch Leads for the selected exhibition and priority
+                let url = `${baseUrl}/leads?exhibitionName=${encodeURIComponent(selectedExhibition)}`;
+                if (selectedPriority !== 'All') {
+                    url += `&priority=${selectedPriority}`;
+                }
+                if (selectedCity !== 'All') {
+                    url += `&city=${encodeURIComponent(selectedCity)}`;
+                }
+                console.log('Fetching leads from:', url);
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.success) {
+                    setLeads(data.data);
+                } else {
+                    console.error('Fetch leads failed:', data.message);
+                }
             }
         } catch (error) {
-            console.error('Failed to fetch leads:', error);
+            console.error('Fetch error:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -84,127 +103,176 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
 
     useFocusEffect(
         useCallback(() => {
-            fetchLeads();
-        }, [selectedPriority, selectedExhibition])
+            fetchData();
+        }, [selectedCity, selectedExhibition, selectedPriority])
     );
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchLeads();
+        fetchData();
     };
 
-    const handlePrioritySelect = (priority: string) => {
-        setSelectedPriority(priority);
-        // fetchLeads(priority); // useFocusEffect will trigger
-    };
+    // Filter logic for search bar
+    const filteredExhibitions = exhibitions.filter(ex =>
+        ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (ex.location && ex.location.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
-    // Filter leads based on search query
     const filteredLeads = leads.filter(lead =>
         lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.mobileNumber.includes(searchQuery) ||
         lead.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const renderItem = ({ item }: { item: Lead }) => (
+    const renderExhibitionItem = ({ item }: { item: Exhibition }) => (
         <TouchableOpacity
-            style={styles.card}
-            onPress={() => router.push({ pathname: '/lead/[id]', params: { id: item._id } })}
+            style={styles.exhibitionCard}
+            onPress={() => {
+                setSelectedExhibition(item.name);
+                setSearchQuery(''); // Clear search when navigating to leads
+                setSelectedPriority('All'); // Reset priority filter
+            }}
         >
-            <View style={styles.cardContent}>
-                {/* Photo */}
-                <Image
-                    source={item.photoUrl ? { uri: item.photoUrl } : (item.cardFront ? { uri: item.cardFront } : { uri: 'https://via.placeholder.com/100' })}
-                    style={styles.avatar}
-                />
-
-                <View style={styles.infoContainer}>
-                    <ThemedText style={styles.name}>{item.name}</ThemedText>
-
-                    <View style={styles.infoRow}>
-                        <Ionicons name="mail-outline" size={14} color="#64748b" />
-                        <ThemedText style={styles.infoText}>{item.email}</ThemedText>
-                    </View>
-
-                    <View style={styles.infoRow}>
-                        <Ionicons name="call-outline" size={14} color="#64748b" />
-                        <ThemedText style={styles.infoText}>{item.mobileNumber}</ThemedText>
-                    </View>
-
-                    <View style={styles.infoRow}>
-                        <Ionicons name="time-outline" size={14} color="#64748b" />
-                        <ThemedText style={styles.infoText}>
-                            {new Date(item.createdAt).toLocaleDateString()}
-                        </ThemedText>
-                    </View>
+            <View style={styles.exhibitionInfo}>
+                <Ionicons name="folder-outline" size={32} color="#6366f1" />
+                <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.exhibitionName}>{item.name}</ThemedText>
+                    <ThemedText style={styles.exhibitionLocation}>
+                        {item.location || 'No location specified'}
+                    </ThemedText>
                 </View>
-
                 <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
             </View>
         </TouchableOpacity>
     );
 
+    const renderLeadItem = ({ item }: { item: Lead }) => (
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push({ pathname: '/lead/[id]', params: { id: item._id } })}
+        >
+            <View style={styles.cardContent}>
+                <Image
+                    source={item.photoUrl ? { uri: item.photoUrl } : (item.cardFront ? { uri: item.cardFront } : { uri: 'https://via.placeholder.com/100' })}
+                    style={styles.avatar}
+                />
+                <View style={styles.infoContainer}>
+                    <ThemedText style={styles.name}>{item.name}</ThemedText>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="call-outline" size={12} color="#64748b" />
+                        <ThemedText style={styles.infoText}>{item.mobileNumber}</ThemedText>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Ionicons name="mail-outline" size={12} color="#64748b" />
+                        <ThemedText style={styles.infoText}>{item.email}</ThemedText>
+                    </View>
+                </View>
+                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) + '20' }]}>
+                    <ThemedText style={[styles.priorityText, { color: getPriorityColor(item.priority) }]}>
+                        {item.priority}
+                    </ThemedText>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+
+    const getPriorityColor = (priority: string) => {
+        switch (priority) {
+            case 'Urgent': return '#ef4444';
+            case 'Most Imp': return '#f97316';
+            case 'Imp': return '#3b82f6';
+            default: return '#64748b';
+        }
+    };
+
     return (
         <ThemedView style={[styles.container, { paddingTop: topInset }]}>
+            {/* Header */}
             <View style={styles.header}>
-                <ThemedText type="title" style={styles.headerTitle}>Leads</ThemedText>
+                {selectedExhibition ? (
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => {
+                            setSelectedExhibition(null);
+                            setSearchQuery(''); // Clear search when going back
+                        }}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#1e293b" />
+                    </TouchableOpacity>
+                ) : null}
+                <ThemedText type="title" style={styles.headerTitle}>
+                    {selectedExhibition || 'Exhibitions'}
+                </ThemedText>
             </View>
 
-            {/* Search Bar */}
+            {/* View-specific Filters */}
+            {!selectedExhibition ? (
+                <CitySelector selectedCity={selectedCity} onSelectCity={(city) => {
+                    setSelectedCity(city);
+                    setSearchQuery('');
+                }} />
+            ) : (
+                <View>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.filterScroll}
+                        contentContainerStyle={styles.filterContainer}
+                    >
+                        {priorities.map((priority) => (
+                            <TouchableOpacity
+                                key={priority}
+                                style={[
+                                    styles.filterButton,
+                                    selectedPriority === priority && styles.filterButtonActive
+                                ]}
+                                onPress={() => setSelectedPriority(priority)}
+                            >
+                                <ThemedText
+                                    style={[
+                                        styles.filterText,
+                                        selectedPriority === priority && styles.filterTextActive
+                                    ]}
+                                >
+                                    {priority}
+                                </ThemedText>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Shared Search Bar */}
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="Search name, email..."
+                    placeholder={selectedExhibition ? "Search leads..." : "Search exhibitions..."}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     placeholderTextColor="#94a3b8"
                 />
             </View>
 
-            {/* Priority Filter */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.filterScroll}
-                contentContainerStyle={styles.filterContainer}
-            >
-                {priorities.map((priority) => (
-                    <TouchableOpacity
-                        key={priority}
-                        style={[
-                            styles.filterButton,
-                            selectedPriority === priority && styles.filterButtonActive
-                        ]}
-                        onPress={() => handlePrioritySelect(priority)}
-                    >
-                        <ThemedText
-                            style={[
-                                styles.filterText,
-                                selectedPriority === priority && styles.filterTextActive
-                            ]}
-                        >
-                            {priority}
-                        </ThemedText>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            {/* Exhibition Selector */}
-            <ExhibitionSelector selectedExhibition={selectedExhibition} onSelectExhibition={setSelectedExhibition} />
-
-            {/* Leads List */}
+            {/* List Content */}
             <FlatList
-                data={filteredLeads}
-                renderItem={renderItem}
-                keyExtractor={(item) => item._id}
+                data={(selectedExhibition ? filteredLeads : filteredExhibitions) as any[]}
+                renderItem={(selectedExhibition ? renderLeadItem : renderExhibitionItem) as any}
+                keyExtractor={(item: any) => item._id}
                 contentContainerStyle={styles.listContent}
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 ListEmptyComponent={
                     !loading ? (
                         <View style={styles.emptyState}>
-                            <Ionicons name="people-outline" size={48} color="#cbd5e1" />
-                            <ThemedText style={styles.emptyText}>No leads found</ThemedText>
+                            <Ionicons
+                                name={selectedExhibition ? "people-outline" : "business-outline"}
+                                size={48}
+                                color="#cbd5e1"
+                            />
+                            <ThemedText style={styles.emptyText}>
+                                {selectedExhibition ? "No leads found" : "No exhibitions found"}
+                            </ThemedText>
                         </View>
                     ) : null
                 }
@@ -225,13 +293,20 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8fafc',
     },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 20,
         paddingBottom: 16,
         paddingTop: 20,
+        gap: 12,
+    },
+    backButton: {
+        padding: 4,
     },
     headerTitle: {
         color: '#1e293b',
         fontWeight: 'bold',
+        flex: 1,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -255,52 +330,89 @@ const styles = StyleSheet.create({
     },
     listContent: {
         padding: 20,
-        gap: 16,
+        paddingTop: 0,
     },
-    card: {
+    exhibitionCard: {
         backgroundColor: 'white',
         borderRadius: 16,
         padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 5,
+        elevation: 1,
+    },
+    exhibitionInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    exhibitionName: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1e293b',
+    },
+    exhibitionLocation: {
+        fontSize: 14,
+        color: '#64748b',
+        marginTop: 2,
+    },
+    card: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 1,
     },
     cardContent: {
         flexDirection: 'row',
-        gap: 16,
+        gap: 12,
         alignItems: 'center',
     },
     avatar: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#f1f5f9',
     },
     infoContainer: {
         flex: 1,
-        gap: 4,
+        gap: 2,
     },
     name: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
         color: '#1e293b',
-        marginBottom: 2,
     },
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 4,
     },
     infoText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#64748b',
+    },
+    priorityBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    priorityText: {
+        fontSize: 10,
+        fontWeight: '700',
     },
     emptyState: {
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 40,
+        padding: 60,
     },
     emptyText: {
         color: '#94a3b8',
@@ -327,8 +439,8 @@ const styles = StyleSheet.create({
     },
     filterButton: {
         paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 25,
+        paddingVertical: 8,
+        borderRadius: 20,
         backgroundColor: 'white',
         borderWidth: 1,
         borderColor: '#e2e8f0',

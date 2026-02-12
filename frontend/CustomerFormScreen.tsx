@@ -38,7 +38,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
         whatsappNumber: '',
         sameAsWhatsapp: true,
         email: '',
-        requirement: '',
+        requirement: [] as string[],
         requirementDescription: '',
         otherRequirement: '',
         priority: 'Normal',
@@ -89,7 +89,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
                             whatsappNumber: item.whatsappNumber || '',
                             sameAsWhatsapp: item.mobileNumber === (item.whatsappNumber || item.mobileNumber),
                             email: item.email || '',
-                            requirement: item.requirement || '',
+                            requirement: Array.isArray(item.requirement) ? item.requirement : (item.requirement ? [item.requirement] : []),
                             requirementDescription: item.requirementDescription || '',
                             otherRequirement: item.otherRequirement || '',
                             priority: item.priority || 'Normal',
@@ -186,7 +186,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
             data.append('visitDate', formData.visitDate);
             data.append('companyName', formData.companyName);
             data.append('whatsappNumber', formData.whatsappNumber);
-            data.append('requirement', formData.requirement);
+            data.append('requirement', formData.requirement.join(',')); // Send as comma-separated for simple backend parsing if needed, but we handle array in backend
             data.append('requirementDescription', formData.requirementDescription);
             data.append('otherRequirement', formData.otherRequirement);
             data.append('exhibitionName', formData.exhibitionName);
@@ -228,7 +228,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
                         whatsappNumber: '',
                         sameAsWhatsapp: true,
                         email: '',
-                        requirement: '',
+                        requirement: [] as string[],
                         requirementDescription: '',
                         otherRequirement: '',
                         priority: 'Normal',
@@ -402,28 +402,39 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
             <View style={styles.section}>
                 <ThemedText type="subtitle" style={styles.sectionTitle}>📋 Requirement</ThemedText>
                 <View style={styles.radioGroup}>
-                    {['EMS', 'BMS', 'Other'].map((option) => (
-                        <TouchableOpacity
-                            key={option}
-                            style={[
-                                styles.radioButton,
-                                formData.requirement === option && styles.radioActive,
-                                readOnly && { opacity: 0.6 }
-                            ]}
-                            onPress={() => !readOnly && setFormData(prev => ({ ...prev, requirement: option }))}
-                            disabled={readOnly}
-                        >
-                            <Ionicons
-                                name={formData.requirement === option ? "radio-button-on" : "radio-button-off"}
-                                size={20}
-                                color={formData.requirement === option ? "#6366f1" : "#64748b"}
-                            />
-                            <ThemedText style={styles.radioLabel}>{option}</ThemedText>
-                        </TouchableOpacity>
-                    ))}
+                    {['EMS', 'BMS', 'Other'].map((option) => {
+                        const isSelected = formData.requirement.includes(option);
+                        return (
+                            <TouchableOpacity
+                                key={option}
+                                style={[
+                                    styles.radioButton,
+                                    isSelected && styles.radioActive,
+                                    readOnly && { opacity: 0.6 }
+                                ]}
+                                onPress={() => {
+                                    if (readOnly) return;
+                                    setFormData(prev => {
+                                        const newRequirement = isSelected
+                                            ? prev.requirement.filter(r => r !== option)
+                                            : [...prev.requirement, option];
+                                        return { ...prev, requirement: newRequirement };
+                                    });
+                                }}
+                                disabled={readOnly}
+                            >
+                                <Ionicons
+                                    name={isSelected ? "checkbox" : "square-outline"}
+                                    size={20}
+                                    color={isSelected ? "#6366f1" : "#64748b"}
+                                />
+                                <ThemedText style={styles.radioLabel}>{option}</ThemedText>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
 
-                {formData.requirement === 'Other' && (
+                {formData.requirement.includes('Other') && (
                     <View style={{ marginTop: 16 }}>
                         <ThemedText style={styles.label}>Please specify other requirement *</ThemedText>
                         <TextInput

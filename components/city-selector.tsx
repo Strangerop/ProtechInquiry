@@ -1,9 +1,9 @@
-import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { API_URL } from '@/constants/config';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from './themed-text';
 
-export const CITIES = ['All', 'Mumbai', 'Ahmedabad', 'Delhi', 'Bangalore'] as const;
-export type City = (typeof CITIES)[number];
+export type City = string;
 
 interface CitySelectorProps {
     selectedCity: City;
@@ -11,6 +11,42 @@ interface CitySelectorProps {
 }
 
 export const CitySelector: React.FC<CitySelectorProps> = ({ selectedCity, onSelectCity }) => {
+    const [cities, setCities] = useState<string[]>(['All']);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchCities = async () => {
+            try {
+                setLoading(true);
+                const baseUrl = API_URL.replace(/\/customers$/, '');
+                const response = await fetch(`${baseUrl}/cities`);
+
+                if (!response.ok) {
+                    console.error(`City fetch failed with status ${response.status}`);
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.success) {
+                    setCities(['All', ...data.data]);
+                }
+            } catch (error) {
+                console.error('Failed to fetch cities:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchCities();
+    }, []);
+
+    if (loading) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="small" color="#6366f1" />
+            </View>
+        );
+    }
+
     return (
         <ScrollView
             horizontal
@@ -18,7 +54,7 @@ export const CitySelector: React.FC<CitySelectorProps> = ({ selectedCity, onSele
             style={styles.container}
             contentContainerStyle={styles.contentContainer}
         >
-            {CITIES.map((city) => (
+            {cities.map((city) => (
                 <TouchableOpacity
                     key={city}
                     style={[

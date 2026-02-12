@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [modalVisible, setModalVisible] = useState(false);
-  const [newExhibition, setNewExhibition] = useState({ name: '', location: '' });
+  const [newExhibition, setNewExhibition] = useState({ name: '', city: 'Mumbai' });
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddExhibition = async () => {
@@ -27,7 +27,7 @@ export default function HomeScreen() {
       const data = await response.json();
       if (data.success) {
         setModalVisible(false);
-        setNewExhibition({ name: '', location: '' });
+        setNewExhibition({ name: '', city: 'Mumbai' });
         setRefreshKey(prev => prev + 1); // Trigger refresh
       } else {
         Alert.alert('Error', data.message || 'Failed to add exhibition');
@@ -64,12 +64,12 @@ export default function HomeScreen() {
               onChangeText={(text) => setNewExhibition(prev => ({ ...prev, name: text }))}
             />
 
-            <ThemedText style={styles.label}>Location</ThemedText>
+            <ThemedText style={styles.label}>City *</ThemedText>
             <TextInput
               style={styles.input}
-              placeholder="e.g. BEC, Goregaon"
-              value={newExhibition.location}
-              onChangeText={(text) => setNewExhibition(prev => ({ ...prev, location: text }))}
+              placeholder="e.g. Mumbai"
+              value={newExhibition.city}
+              onChangeText={(text) => setNewExhibition(prev => ({ ...prev, city: text }))}
             />
 
             <View style={styles.modalButtons}>
@@ -151,6 +151,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366f1',
   },
   saveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  cityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  cityOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  cityOptionActive: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  cityOptionText: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  cityOptionTextActive: {
     color: '#fff',
     fontWeight: '600',
   },
