@@ -136,7 +136,7 @@ export const LeadsListScreen: React.FC<LeadsListScreenProps> = ({ topInset }) =>
     return (
         <ThemedView style={[styles.container, { paddingTop: topInset }]}>
             <View style={styles.header}>
-                <ThemedText type="title">Leads</ThemedText>
+                <ThemedText type="title" style={styles.headerTitle}>Leads</ThemedText>
             </View>
 
             {/* Search Bar */}
@@ -214,7 +214,11 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 20,
         paddingBottom: 16,
-        paddingTop: 10,
+        paddingTop: 20,
+    },
+    headerTitle: {
+        color: '#1e293b',
+        fontWeight: 'bold',
     },
     searchContainer: {
         flexDirection: 'row',
