@@ -165,8 +165,8 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
             }
         } else {
             // Customer validation
-            if (!formData.cardFront || !formData.name || !formData.email || !formData.mobileNumber || !formData.companyName) {
-                Alert.alert('Error', 'Please fill in all required fields.');
+            if (!formData.name || !formData.email || !formData.mobileNumber || !formData.companyName) {
+                Alert.alert('Error', 'Please fill in all required fields (Name, Email, Mobile, Company).');
                 return;
             }
         }
@@ -296,7 +296,7 @@ export const CustomerFormScreen: React.FC<CustomerFormScreenProps> = ({ topInset
 
             <View style={styles.section}>
                 <ThemedText type="subtitle" style={styles.sectionTitle}>
-                    📸 Visiting Card Photos *
+                    📸 Visiting Card Photos
                 </ThemedText>
                 <View style={styles.grid}>
                     <View style={styles.gridItem}>

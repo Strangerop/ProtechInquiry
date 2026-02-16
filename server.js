@@ -288,6 +288,13 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
       }
     }
 
+    // Look up exhibition city if not provided
+    let finalCity = city;
+    if (!finalCity || finalCity === 'All') {
+      const exhibition = await Exhibition.findOne({ name: exhibitionName || 'Tech Expo Mumbai' });
+      finalCity = exhibition ? exhibition.city : 'Mumbai';
+    }
+
     const lead = new Lead({
       name,
       email,
@@ -296,7 +303,7 @@ app.post('/api/leads', upload.fields([{ name: 'cardFront', maxCount: 1 }, { name
       cardFront: cardFrontUrl,
       cardBack: cardBackUrl,
       priority: priority || 'Normal',
-      city: city || 'Mumbai',
+      city: finalCity,
       exhibitionName: exhibitionName || 'Tech Expo Mumbai',
       requirement: requirementArray,
       type: 'Lead'
@@ -479,11 +486,19 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
       }
     }
 
-    // Validation for images (if they are still considered required)
+    // Validation for images (Optional now)
+    /*
     if (!cardFrontUrl || !cardBackUrl) {
-      // Note: User prompt says "Images must be uploaded to Cloudinary", implying they are required.
-      // Adjusting validation to match requirements.
       return res.status(400).json({ success: false, message: 'Both cardFront and cardBack images are required.' });
+    }
+    */
+
+    // Look up exhibition city if not provided
+    let finalCity = req.body.city;
+    const finalExhibitionName = req.body.exhibitionName || 'Tech Expo Mumbai';
+    if (!finalCity || finalCity === 'All') {
+      const exhibition = await Exhibition.findOne({ name: finalExhibitionName });
+      finalCity = exhibition ? exhibition.city : 'Mumbai';
     }
 
     // Create new customer document
@@ -499,8 +514,8 @@ app.post('/api/customers', upload.fields([{ name: 'cardFront', maxCount: 1 }, { 
       requirementDescription,
       otherRequirement,
       priority: priority || 'Normal',
-      city: req.body.city || 'Mumbai',
-      exhibitionName: req.body.exhibitionName || 'Tech Expo Mumbai',
+      city: finalCity,
+      exhibitionName: finalExhibitionName,
       visitDate: parseDate(visitDate) || Date.now(),
       type: 'Customer'
     });
